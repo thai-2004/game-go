@@ -11,7 +11,7 @@ function intro_typeWriter() {
     if (a < introText.length) {
         introElement.textContent += introText.charAt(a);
         a++;
-        setTimeout(intro_typeWriter, 210); // Tốc độ gõ chữ (100ms mỗi ký tự)
+        setTimeout(intro_typeWriter, 280); // Tốc độ gõ chữ (100ms mỗi ký tự)
     } else {
         // Kết thúc intro, chuyển sang trang chính
         setTimeout(() => {
