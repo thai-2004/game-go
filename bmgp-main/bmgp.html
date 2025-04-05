@@ -5,25 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title id="text-container"></title>
   <link rel="stylesheet" href="style.css">
+  <!-- Load các script bên ngoài trước -->
+  <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 </head>
 <body>
   <div id = "intro">
     <span id = "intro-text"></span>
-    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
-    <!-- Khởi tạo Particles.js -->
-    <script>
-      particlesJS.load('intro', 'particles.json', function() {
-        console.log('Particles.js loaded');
-      });
-    </script>
   </div>
   <div class="stars"></div>
   <div id="container">
     <div id="controls">
       <select id="size" aria-label="Select board size">
-        <option value="11" selected>9x9</option>
-        <option value="15">13x13</option>
-        <option value="21">19x19</option>
+        <option value="9" selected>9x9</option>
+        <option value="13">13x13</option>
+        <option value="19">19x19</option>
       </select>
       <select id="gameMode" aria-label="Select game mode">
         <option value="human">Người vs. Người</option>
@@ -31,7 +26,18 @@
         <option value="computer-computer">Máy vs. Máy</option>
       </select>
       <button id="startButton">Bắt đầu</button>
+      <button id="viewWeightsButton">Xem trọng số</button>
+      <button id="saveWeightsButton">Lưu trọng số</button>
+      <button id="loadWeightsButton">Tải trọng số</button>
+      <button id="viewDataButton">Xem dữ liệu</button>
+      <button id="clearDataButton">Xóa dữ liệu</button>
     </div>
+    
+    <div id="weights-display" style="display: none;">
+      <h3>Trọng số Neural Network:</h3>
+      <pre id="weights-content"></pre>
+    </div>
+    
     <div id="game-container">
       <canvas id="gobang" width="500" height="500" ></canvas>
       <div id="history">
@@ -41,8 +47,17 @@
     </div>
     <div id="score">Đen đi trước</div>
   </div>
-  <script src="bmgp.js"></script>
+
+  <script>
+    particlesJS.load('intro', 'particles.json', function() {
+      console.log('Particles.js loaded');
+    });
+  </script>
+
+  <!-- Load các script của game theo thứ tự đúng -->
+  <script src="neural_network.js"></script>
   <script src="print.js"></script>
+  <script src="bmgp.js"></script>
   <script src="intro.js"></script>
 </body>
 </html>

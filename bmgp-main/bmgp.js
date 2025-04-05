@@ -1,87 +1,336 @@
-const canvas = document.getElementById('gobang');
-const ctx = canvas.getContext('2d');
-const EMPTY = 0
-const BLACK = 1
-const WHITE = 2
-const MARKER = 4
-const OFFBOARD = 7
-const LIBERTY = 8
+// Khai báo các hằng số
+const EMPTY = 0;
+const BLACK = 1;
+const WHITE = 2;
+const MARKER = 4;
+const OFFBOARD = 7;
+const LIBERTY = 8;
 
-var board = [];
-var size = 15;
-var side = BLACK;
-var liberties = [];
-var block = [];
-var points_side = [];
-var points_count = [];
-var ko = EMPTY; // Khởi tạo vị trí ko (vị trí không thể đánh).
-var bestMove = EMPTY;
-var userMove = 0;
-var cell = canvas.width / size;
-var selectSize = document.getElementById("size");
-const gameModeSelect = document.getElementById('gameMode');
-const startButton = document.getElementById('startButton');
-let gameMode = 'computer'; // Mặc định chơi với máy
+// Biến toàn cục cho game state
+let board = [];
+let size = 9;
+let side = BLACK;
+let liberties = [];
+let block = [];
+let points_side = [];
+let points_count = [];
+let ko = EMPTY;
+let bestMove = EMPTY;
+let userMove = 0;
+let cell;
+let gameMode = 'computer';
 
-// Lắng nghe sự kiện thay đổi chế độ chơi
-gameModeSelect.addEventListener('change', function() {
-    gameMode = gameModeSelect.value;
+// DOM elements
+let canvas;
+let ctx;
+let selectSize;
+let gameModeSelect;
+let startButton;
+let moveList;
+
+// Sử dụng các thành phần neural network trực tiếp từ window
+// không khai báo lại với let
+console.log("Neural network available:", !!window.neuralNet);
+const neuralNet = window.neuralNet;
+const dataCollector = window.dataCollector; 
+// const saveWeights = window.saveWeights;
+// const loadWeights = window.loadWeights;
+
+// Thêm biến đếm số nước đi trước khi học
+let moveCounter = 0;
+const LEARN_FREQUENCY = 10; // Học sau mỗi 10 nước đi
+
+// Khởi tạo bàn cờ và vẽ khi trang web được tải
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM đã load xong");
+    
+    // Tự động tải trọng số từ localStorage khi khởi động
+    if (window.loadWeights) {
+        console.log("Đang tải trọng số đã lưu...");
+        window.loadWeights();
+        console.log("Trọng số đã được tải thành công");
+    }
+    
+    // Lấy các DOM elements
+    canvas = document.getElementById('gobang');
+    if (!canvas) {
+        console.error('Không tìm thấy canvas');
+        return;
+    }
+    ctx = canvas.getContext('2d');
+    
+    selectSize = document.getElementById('size');
+    gameModeSelect = document.getElementById('gameMode');
+    startButton = document.getElementById('startButton');
+    moveList = document.getElementById('moveList');
+
+    // Thêm các elements mới
+    const viewWeightsButton = document.getElementById('viewWeightsButton');
+    const saveWeightsButton = document.getElementById('saveWeightsButton');
+    const loadWeightsButton = document.getElementById('loadWeightsButton');
+    const viewDataButton = document.getElementById('viewDataButton');
+    const clearDataButton = document.getElementById('clearDataButton');
+    const weightsDisplay = document.getElementById('weights-display');
+    const weightsContent = document.getElementById('weights-content');
+
+    if (!selectSize || !gameModeSelect || !startButton || !moveList) {
+        console.error('Không tìm thấy một hoặc nhiều phần tử DOM cần thiết');
+        return;
+    }
+
+    // Khởi tạo kích thước ô
+    size = parseInt(selectSize.value);
+    cell = canvas.width / size;
+
+    // Khởi tạo game
+    initBoard();
+    drawBoard();
+
+    // Thêm event listeners
+    selectSize.addEventListener('change', function() {
+        size = parseInt(selectSize.value);
+        cell = canvas.width / size;
+        initBoard();
+        drawBoard();
+    });
+
+    gameModeSelect.addEventListener('change', function() {
+        gameMode = gameModeSelect.value;
+    });
+
+    // Xử lý nút Xem trọng số
+    if (viewWeightsButton) {
+        viewWeightsButton.addEventListener('click', function() {
+            if (!neuralNet) {
+                alert('Neural network chưa được khởi tạo!');
+                return;
+            }
+            
+            // Hiển thị/ẩn khu vực trọng số
+            if (weightsDisplay.style.display === 'none') {
+                weightsDisplay.style.display = 'block';
+                weightsContent.textContent = JSON.stringify(neuralNet.weights, null, 2);
+            } else {
+                weightsDisplay.style.display = 'none';
+            }
+        });
+    }
+
+    // Xử lý nút Lưu trọng số
+    if (saveWeightsButton) {
+        saveWeightsButton.addEventListener('click', function() {
+            if (!neuralNet) {
+                alert('Neural network chưa được khởi tạo!');
+                return;
+            }
+            
+            // Lưu trọng số vào localStorage
+            window.saveWeights();
+            alert('Đã lưu trọng số thành công!');
+        });
+    }
+
+    // Xử lý nút Tải trọng số
+    if (loadWeightsButton) {
+        loadWeightsButton.addEventListener('click', function() {
+            // Tải trọng số từ localStorage
+            window.loadWeights();
+            
+            if (weightsDisplay.style.display === 'block') {
+                weightsContent.textContent = JSON.stringify(neuralNet.weights, null, 2);
+            }
+            
+            alert('Đã tải trọng số thành công!');
+        });
+    }
+
+    // Xử lý nút Xem dữ liệu
+    if (viewDataButton) {
+        viewDataButton.addEventListener('click', function() {
+            if (!dataCollector) {
+                alert('Data collector chưa được khởi tạo!');
+                return;
+            }
+            
+            const trainingData = dataCollector.exportTrainingData();
+            alert(`Hiện có ${trainingData.length} mẫu dữ liệu training đã được thu thập.`);
+        });
+    }
+    
+    // Xử lý nút Xóa dữ liệu
+    if (clearDataButton) {
+        clearDataButton.addEventListener('click', function() {
+            if (!dataCollector) {
+                alert('Data collector chưa được khởi tạo!');
+                return;
+            }
+            
+            if (confirm('Bạn có chắc chắn muốn xóa tất cả dữ liệu training? Hành động này không thể hoàn tác.')) {
+                dataCollector.clearData();
+                alert('Đã xóa tất cả dữ liệu training.');
+            }
+        });
+    }
+
+    startButton.addEventListener('click', function() {
+        console.log('Nút Start được nhấn');
+        // Cập nhật kích thước bàn cờ và tính lại kích thước ô
+        size = parseInt(selectSize.value);
+        cell = canvas.width / size;
+        
+        // Khởi tạo lại bàn cờ
+        initBoard();
+        
+        // Xóa lịch sử nước đi
+        moveList.innerHTML = '';
+        
+        // Vẽ lại bàn cờ
+        drawBoard();
+        console.log('Đã vẽ lại bàn cờ với kích thước:', size);
+
+        // Remove existing listener
+        canvas.removeEventListener('click', userInput);
+
+        // Add correct listener based on game mode
+        if (gameModeSelect.value === 'human') {
+            canvas.addEventListener('click', userInput);
+            console.log('Human vs. Human mode');
+        } else if (gameModeSelect.value === 'computer') {
+            canvas.addEventListener('click', userInput);
+            console.log('Human vs Computer mode');
+        } else if (gameModeSelect.value === 'computer-computer') {
+            console.log('Computer vs Computer mode');
+            canvas.removeEventListener('click', userInput);
+            let moveInterval = setInterval(() => {
+                if (!play(6)) {
+                    clearInterval(moveInterval);
+                    endGame();
+                    console.log("Game over!");
+                    return;
+                }
+                side = 3 - side;
+                drawBoard();
+            }, 1000);
+        } else {
+            console.log('Invalid game mode');
+        }
+    });
 });
 
 // GUI
-function drawBoard() { /* Render board to screen */
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath();
-  for (let i = 0; i < size; i++) {
-    const x = i * cell + cell / 2;
-    const y = i * cell + cell / 2;
+function drawBoard() {
+    // Tính lại kích thước ô
+    cell = canvas.width / size;
+    
+    // Xóa bàn cờ cũ
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Vẽ nền bàn cờ
+    ctx.fillStyle = "#F4A460";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Vẽ lưới
+    ctx.beginPath();
     ctx.strokeStyle = "black";
-    ctx.moveTo(cell / 2, y);
-    ctx.lineTo(canvas.width - cell / 2, y);
-    ctx.moveTo(x, cell / 2);
-    ctx.lineTo(x, canvas.height - cell / 2);
-  };ctx.stroke();
-  for (let row = 0; row < size; row++) {
-    for (let col = 0; col < size; col++) {
-      let sq = row * size + col;
-      if (board[sq] == 7) continue;
-      if (board[sq]) {
-        let color = board[sq] == 1 ? "black" : "white";
-        ctx.beginPath();
-        ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell / 2 - 2, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.stroke();
-      }
-      if (sq == userMove) {
-        let color = board[sq] == 1 ? "white" : "black";
-        ctx.beginPath();
-        ctx.arc(col * cell+(cell/4)*2, row * cell +(cell/4)*2, cell / 4 - 2, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.stroke();
-      }
+    ctx.lineWidth = 1;
+    
+    // Vẽ các đường ngang
+    for (let i = 0; i < size; i++) {
+        const y = i * cell + cell / 2;
+        ctx.moveTo(cell / 2, y);
+        ctx.lineTo(canvas.width - cell / 2, y);
     }
-  }
+    
+    // Vẽ các đường dọc
+    for (let i = 0; i < size; i++) {
+        const x = i * cell + cell / 2;
+        ctx.moveTo(x, cell / 2);
+        ctx.lineTo(x, canvas.height - cell / 2);
+    }
+    ctx.stroke();
+
+    // Vẽ điểm hoshi (điểm đánh dấu)
+    const hoshiPoints = getHoshiPoints(size);
+    for (const point of hoshiPoints) {
+        const x = point.x * cell + cell / 2;
+        const y = point.y * cell + cell / 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = "black";
+        ctx.fill();
+    }
+
+    // Vẽ quân cờ
+    for (let row = 0; row < size; row++) {
+        for (let col = 0; col < size; col++) {
+            let sq = row * size + col;
+            if (board[sq] == OFFBOARD) continue;
+            if (board[sq]) {
+                let color = board[sq] == BLACK ? "black" : "white";
+                ctx.beginPath();
+                ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell * 0.45, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            if (sq == userMove) {
+                let color = board[sq] == BLACK ? "white" : "black";
+                ctx.beginPath();
+                ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell * 0.2, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+    }
 }
 
-function userInput(event) { /* Handle user input */
-  let rect = canvas.getBoundingClientRect();
-  let mouseX = event.clientX - rect.left;
-  let mouseY = event.clientY - rect.top;
-  let col = Math.floor(mouseX / cell);
-  let row = Math.floor(mouseY / cell);
-  let sq = row * size + col;
-  if (board[sq]) return;
-  if (!setStone(sq, side, true)) return;
-  drawBoard();
-  addToHistory(sq, side); // Thêm nước đi vào lịch sử
-  if (gameMode === 'computer') {
-    side = 3 - side; // Switch turn after user's move
-    setTimeout(function() { play(6); }, 10);
-  } else {
-    side = 3 - side; // Switch turn after user's move
-  }
+// Hàm trả về vị trí các điểm hoshi dựa trên kích thước bàn cờ
+function getHoshiPoints(size) {
+    const points = [];
+    if (size === 9) {
+        points.push({x: 2, y: 2}, {x: 6, y: 2}, {x: 4, y: 4}, {x: 2, y: 6}, {x: 6, y: 6});
+    } else if (size === 13) {
+        points.push(
+            {x: 3, y: 3}, {x: 9, y: 3},
+            {x: 6, y: 6},
+            {x: 3, y: 9}, {x: 9, y: 9}
+        );
+    } else if (size === 19) {
+        points.push(
+            {x: 3, y: 3}, {x: 9, y: 3}, {x: 15, y: 3},
+            {x: 3, y: 9}, {x: 9, y: 9}, {x: 15, y: 9},
+            {x: 3, y: 15}, {x: 9, y: 15}, {x: 15, y: 15}
+        );
+    }
+    return points;
+}
+
+function userInput(event) {
+    let rect = canvas.getBoundingClientRect();
+    let mouseX = event.clientX - rect.left;
+    let mouseY = event.clientY - rect.top;
+    let col = Math.floor(mouseX / cell);
+    let row = Math.floor(mouseY / cell);
+    
+    // Kiểm tra biên
+    if (col < 0 || col >= size || row < 0 || row >= size) {
+        return;
+    }
+    
+    let sq = row * size + col;
+    if (board[sq]) return;
+    if (!setStone(sq, side, true)) return;
+    drawBoard();
+    addToHistory(sq, side);
+    if (gameMode === 'computer') {
+        side = 3 - side;
+        setTimeout(function() { play(6); }, 10);
+    } else {
+        side = 3 - side;
+    }
 }
 
 function territory(sq) { /* Count territory, returns [side, points] */
@@ -127,17 +376,29 @@ function score() { /* Scores game, returns points [empty, black, white]*/
   return scorePosition;
 }
 
-function updateScore() { /* Render score to screen */
-  let element = document.getElementById("score");
-  element.innerHTML = "Black " + pts[BLACK] + ", White " + pts[WHITE] + ", Empty " + pts[EMPTY];
+function updateScore() {
+    const pts = score();
+    const element = document.getElementById("score");
+    element.innerHTML = `Đen: ${pts[BLACK]}, Trắng: ${pts[WHITE]}, Trống: ${pts[EMPTY]}`;
 }
 
 // ENGINE
-function initBoard() { /* Empty board, set offboard squares */
-  board = [];
-  for (let sq = 0; sq < size ** 2; sq++) {
-        board[sq] = EMPTY;
-  }
+function initBoard() {
+    // Tính lại kích thước ô
+    cell = canvas.width / size;
+    
+    // Khởi tạo mảng board với kích thước mới
+    board = new Array(size * size).fill(EMPTY);
+    
+    // Reset các biến trạng thái
+    side = BLACK;
+    ko = EMPTY;
+    userMove = 0;
+    bestMove = EMPTY;
+    liberties = [];
+    block = [];
+    points_side = [];
+    points_count = [];
 }
 
 function inEye(sq) { /* Check if square is in diamond shape */
@@ -258,60 +519,52 @@ function getUrgentMoves() { /* Get escape squares of groups with less than 3 lib
   
   return [...new Set(urgent)]; // Trả về mảng các nước đi khẩn cấp mà không có giá trị trùng lặp.
 }
-function evaluate() { /* Count captures stones difference */
-  let eval = 0; // Khởi tạo biến đánh giá tổng thể.
-  let blackStones = 0; // Biến để đếm số viên đá đen.
-  let whiteStones = 0; // Biến để đếm số viên đá trắng.
-  
-  // Lặp qua tất cả các ô trên bàn cờ.
-  for (let sq = 0; sq < size ** 2; sq++) {
-    // Bỏ qua ô trống và ô ngoài bàn cờ.
-    if (!board[sq] || board[sq] == OFFBOARD) continue;
-    
-    // Đếm số viên đá đen.
-    if (board[sq] == BLACK) blackStones += 1;
-    
-    // Đếm số viên đá trắng.
-    if (board[sq] == WHITE) whiteStones += 1;
-  }
-  
-  // Tính sự chênh lệch giữa số viên đá đen và trắng.
-  eval += (blackStones - whiteStones);
-  
-  // Trả về giá trị đánh giá dựa trên bên hiện tại.
-  return (side == BLACK) ? eval : -eval;
+
+// Sửa đổi hàm evaluate để sử dụng neural network
+function evaluate() {
+    if (!neuralNet) {
+        window.loadWeights();
+    }
+
+    const gameState = {
+        board: board,
+        side: side,
+        ko: ko
+    };
+
+    return neuralNet.evaluate(gameState);
 }
 
-function search(depth) { /* Recursively search fighting moves */
-  if (!depth) return evaluate(); // Nếu độ sâu là 0, trả về giá trị đánh giá hiện tại của bàn cờ.
-  
-  let bestScore = -10000; // Khởi tạo điểm số tốt nhất với giá trị rất thấp.
-  
-  for (let sq of getUrgentMoves()) { // Lặp qua các nước đi khẩn cấp.
-    for (let offset of [1, size, -1, -size]) // Lặp qua các offset để kiểm tra các vị trí xung quanh.
-      if (board[sq + offset] == OFFBOARD && depth == 1) continue; // Nếu vị trí ngoài bàn cờ và độ sâu là 1, bỏ qua.
-    
-    if (sq == ko) continue; // Nếu nước đi là nước đi ko, bỏ qua.
-    
-    let oldBoard = JSON.stringify(board); // Lưu trạng thái bàn cờ hiện tại.
-    let oldSide = side; // Lưu bên hiện tại (đen hoặc trắng).
-    let oldKo = ko; // Lưu vị trí ko hiện tại.
-    
-    if (!setStone(sq, side, false)) continue; // Đặt viên đá tại vị trí sq, nếu không thành công, bỏ qua.
-    
-    let eval = -search(depth - 1); // Gọi đệ quy hàm search với độ sâu giảm đi 1 và đảo ngược giá trị đánh giá.
-    
-    if (eval > bestScore) { // Nếu giá trị đánh giá tốt hơn điểm số tốt nhất đã lưu.
-      bestScore = eval; // Cập nhật điểm số tốt nhất.
-      if (depth == 6) bestMove = sq; // Nếu độ sâu là 6, lưu nước đi tốt nhất.
+function search(depth) {
+    if (!depth) return evaluate();
+
+    let bestScore = -10000;
+
+    for (let sq of getUrgentMoves()) {
+        for (let offset of [1, size, -1, -size])
+            if (board[sq + offset] == OFFBOARD && depth == 1) continue;
+
+        if (sq == ko) continue;
+
+        let oldBoard = JSON.stringify(board);
+        let oldSide = side;
+        let oldKo = ko;
+
+        if (!setStone(sq, side, false)) continue;
+
+        let currentScore = -search(depth - 1);
+
+        if (currentScore > bestScore) {
+            bestScore = currentScore;
+            if (depth == 6) bestMove = sq;
+        }
+
+        board = JSON.parse(oldBoard);
+        side = oldSide;
+        ko = oldKo;
     }
-    
-    board = JSON.parse(oldBoard); // Khôi phục trạng thái bàn cờ.
-    side = oldSide; // Khôi phục bên hiện tại.
-    ko = oldKo; // Khôi phục vị trí ko.
-  }
-  
-  return bestScore; // Trả về điểm số tốt nhất tìm được.
+
+    return bestScore;
 }
 
 function tenuki(direction) { /* Play away when no urgent moves */
@@ -344,13 +597,13 @@ function tenuki(direction) { /* Play away when no urgent moves */
   }
 }
 
-function play(depth) { /* Engine plays a move */
-    let eval = 0;
+// Sửa đổi hàm play để thu thập dữ liệu training và học liên tục
+function play(depth) {
+    let currentScore = 0;
     bestMove = 0;
-    eval = search(depth);
+    currentScore = search(depth);
 
     if (!bestMove) {
-        // If no tactical move is found, play a random empty square
         let emptySquares = [];
         for (let i = 0; i < size * size; i++) {
             if (board[i] === EMPTY) {
@@ -361,23 +614,66 @@ function play(depth) { /* Engine plays a move */
             bestMove = emptySquares[Math.floor(Math.random() * emptySquares.length)];
         } else {
             console.log("Board is full - game over!");
-            return; // Game over
+            endGame();
+            return false;
         }
     }
 
     if (!setStone(bestMove, side, false)) {
         console.log("Could not set stone, skipping turn");
-        return;
+        return false;
+    }
+
+    // Lưu trạng thái game sau mỗi nước đi
+    dataCollector.saveGameState(board, bestMove, side, evaluate());
+    
+    // Tăng bộ đếm nước đi
+    moveCounter++;
+    
+    // Thực hiện học liên tục sau mỗi X nước đi
+    if (moveCounter >= LEARN_FREQUENCY) {
+        continuousLearning();
+        moveCounter = 0; // Reset bộ đếm
     }
 
     drawBoard();
     addToHistory(bestMove, side);
     updateScore();
+    return true;
+}
+
+// Hàm học liên tục trên dữ liệu đã thu thập
+function continuousLearning() {
+    console.log("Đang thực hiện học liên tục...");
+    
+    if (!window.neuralNet || !window.dataCollector || !window.trainNetwork || !window.saveWeights) {
+        console.error("Không thể học liên tục: thiếu các thành phần cần thiết");
+        return;
+    }
+    
+    try {
+        // Lấy dữ liệu training từ data collector
+        const trainingData = window.dataCollector.exportTrainingData();
+        
+        if (trainingData.length > 0) {
+            // Nếu có quá nhiều dữ liệu, chỉ lấy 50 mẫu gần nhất để học
+            const recentData = trainingData.slice(-50);
+            console.log(`Học liên tục trên ${recentData.length} mẫu dữ liệu gần nhất`);
+            
+            // Huấn luyện neural network với dữ liệu mới - chỉ 3 epochs để tránh chậm
+            window.trainNetwork(recentData, 3);
+            
+            // Lưu trọng số đã được cập nhật vào localStorage
+            window.saveWeights();
+            
+            console.log("Học liên tục hoàn tất, đã lưu trọng số");
+        }
+    } catch (error) {
+        console.error("Lỗi khi học liên tục:", error);
+    }
 }
 
 // Lịch sử nước đi
-const moveList = document.getElementById('moveList');
-
 function addToHistory(sq, side) {
     const moveItem = document.createElement('li');
     const row = Math.floor(sq / size);
@@ -385,55 +681,35 @@ function addToHistory(sq, side) {
     const color = side === BLACK ? 'Đen' : 'Trắng';
     moveItem.textContent = `${color}: (${col}, ${row})`;
     moveList.insertBefore(moveItem, moveList.firstChild);
-    // moveList.appendChild(moveItem);
-    // moveList.scrollTop = moveList.scrollHeight; // Tự động cuộn xuống cuối
 }
 
-// Update score display
-function updateScore() { /* Render score to screen */
-  let pts = score();
-  let element = document.getElementById("score");
-  element.innerHTML = "Đen: " + pts[BLACK] + ", Trắng: " + pts[WHITE] + ", Empty: " + pts[EMPTY];
-}
-
-// --- Event Listeners ---
-startButton.addEventListener('click', function() {
-  size = parseInt(selectSize.value);
-  cell = canvas.width / size;
-  initBoard();
-  drawBoard();
-  side = BLACK;
-  ko = EMPTY;
-
-  // Remove existing listener (to avoid duplicates)
-  canvas.removeEventListener('click', userInput);
-
-  // Add correct listener based on game mode
-  if (gameModeSelect.value === 'human') {
-    canvas.addEventListener('click', userInput);
-    console.log('Human vs. Human mode');
-  } else if (gameModeSelect.value === 'computer'){
-    canvas.addEventListener('click', userInput);
-    console.log('Human vs Computer mode');
-  } else if (gameModeSelect.value === 'computer-computer'){
-    console.log('Computer vs Computer mode');
-    // computerVsComputer(); // Start the machine game automatically
-    canvas.removeEventListener('click', userInput); // Disable human input
-    let moveInterval = setInterval(() => {
-      play(6);
-      side = 3 - side;  // Switch sides
-      drawBoard();
-      if (board.every(cell => cell !== EMPTY)) {
-        clearInterval(moveInterval);
-        console.log("Game over - board full!");
+// Thêm hàm endGame để training network
+function endGame() {
+    console.log("Game kết thúc, đang huấn luyện neural network...");
+    
+    // Đảm bảo neuralNet và các hàm hỗ trợ tồn tại
+    if (!window.neuralNet || !window.dataCollector || !window.trainNetwork || !window.saveWeights) {
+        console.error("Không thể huấn luyện neural network: thiếu các thành phần cần thiết");
         return;
-      }
-    }, 1000);
-  } else {
-    console.log('Invalid game mode');
-  }
-});
-
-//Call initBoard() and drawBoard() once the page loads
-initBoard();
-drawBoard();
+    }
+    
+    try {
+        // Lấy dữ liệu training từ data collector
+        const trainingData = window.dataCollector.exportTrainingData();
+        console.log(`Có ${trainingData.length} mẫu dữ liệu training`);
+        
+        if (trainingData.length > 0) {
+            // Huấn luyện neural network với dữ liệu mới
+            window.trainNetwork(trainingData, 10); // Huấn luyện 10 epochs
+            
+            // Lưu trọng số đã được cập nhật vào localStorage
+            window.saveWeights();
+            console.log("Đã lưu trọng số neural network");
+            
+            // Hiển thị thông báo
+            alert("Game kết thúc! Trọng số AI đã được cập nhật và lưu lại.");
+        }
+    } catch (error) {
+        console.error("Lỗi khi huấn luyện neural network:", error);
+    }
+}

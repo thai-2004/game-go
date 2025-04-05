@@ -1,8 +1,8 @@
 // Nội dung intro
-const introText = "Chào mừng các bạn đến với trò chơi Cờ vây ...";
+const introText = "...";
 const introElement = document.getElementById("intro-text");
 const mainContent = document.getElementById("container");
-//const music = document.getElementById("background-music");
+const music = document.getElementById("background-music");
 
 let a = 0;
 
@@ -11,7 +11,7 @@ function intro_typeWriter() {
     if (a < introText.length) {
         introElement.textContent += introText.charAt(a);
         a++;
-        setTimeout(intro_typeWriter, 280); // Tốc độ gõ chữ (100ms mỗi ký tự)
+        setTimeout(intro_typeWriter, 1000); // Tốc độ gõ chữ (100ms mỗi ký tự)
     } else {
         // Kết thúc intro, chuyển sang trang chính
         setTimeout(() => {
@@ -19,7 +19,9 @@ function intro_typeWriter() {
             setTimeout(() => {
                 intro.style.display = "none"; // Ẩn intro
                 mainContent.style.display = "block"; // Hiển thị trang chính
-                music.play(); // Phát nhạc nền
+                if (music) { // Add null check
+                    music.play(); // Phát nhạc nền
+                }
             }, 1000); // Thời gian fade out (1 giây)
         }, 2000); // Thời gian chờ trước khi fade out (2 giây)
     }
