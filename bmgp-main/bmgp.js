@@ -644,39 +644,73 @@ function restoreBoard() { /* Remove group markers */
 }
 
 function setStone(sq, color, user) { /* Place stone on board */
-  // Kiểm tra xem ô đã có viên đá hay chưa
-  if (board[sq] != EMPTY) {
-    if (user) alert("Illegal move!"); // Nếu là người dùng, hiển thị thông báo nước đi không hợp lệ
-    return false; // Trả về false nếu ô đã có viên đá
-  } else if (sq == ko) { // Kiểm tra xem nước đi có phải là nước đi ko không
-    if (user) alert("Ko!"); // Nếu là người dùng, hiển thị thông báo nước đi ko
-    return false; // Trả về false nếu nước đi là ko
-  }
-  
-  let old_ko = ko; // Lưu vị trí ko hiện tại
-  ko = EMPTY; // Đặt lại vị trí ko về trống
-  board[sq] = color; // Đặt viên đá tại vị trí sq với màu đã cho
-  
-  captures(3 - color, sq); // Gọi hàm captures để xử lý các viên đá bị bắt
-  count(sq, color); // Gọi hàm count để đếm số ô tự do cho nhóm viên đá
-  
-  let suicide = liberties.length ? false : true; // Kiểm tra xem nước đi có phải là tự sát không
-  restoreBoard(); // Khôi phục trạng thái bàn cờ về trước khi đặt viên đá
-  
-  if (suicide) { // Nếu nước đi là tự sát
-    board[sq] = EMPTY; // Đặt lại ô đó thành trống
-    ko = old_ko; // Khôi phục vị trí ko
-    if (user) alert("Suicide move!"); // Nếu là người dùng, hiển thị thông báo nước đi tự sát
-    return false; // Trả về false
-  }
-  
-  // Thêm nước đi vào lịch sử
-  if (!moveHistory.includes(sq)) {
-    moveHistory.push(sq);
-  }
-  
-  userMove = sq; // Lưu nước đi của người dùng
-  return true; // Trả về true nếu nước đi hợp lệ
+    // Debug thông tin nước đi
+    console.log('Debug - setStone:', {
+        square: sq,
+        color: color === BLACK ? 'Đen' : 'Trắng',
+        isUser: user,
+        currentBoard: [...board]
+    });
+
+    // Kiểm tra xem ô đã có viên đá hay chưa
+    if (board[sq] != EMPTY) {
+        console.log('Nước đi không hợp lệ: Ô đã có quân');
+        if (user) alert("Illegal move!");
+        return false;
+    } else if (sq == ko) {
+        console.log('Nước đi không hợp lệ: Nước đi ko');
+        if (user) alert("Ko!");
+        return false;
+    }
+    
+    let old_ko = ko;
+    ko = EMPTY;
+    
+    // Lưu trạng thái bàn cờ trước khi đặt quân
+    const oldBoard = [...board];
+    
+    // Đặt quân cờ
+    board[sq] = color;
+    
+    // Kiểm tra và xử lý quân bị bắt
+    captures(3 - color, sq);
+    
+    // Đếm số tự do
+    count(sq, color);
+    
+    // Kiểm tra nước đi tự sát
+    let suicide = liberties.length === 0;
+    
+    // Khôi phục trạng thái bàn cờ
+    restoreBoard();
+    
+    if (suicide) {
+        console.log('Nước đi không hợp lệ: Tự sát');
+        board[sq] = EMPTY;
+        ko = old_ko;
+        if (user) alert("Suicide move!");
+        return false;
+    }
+    
+    // Nếu nước đi hợp lệ, thực hiện lại các bước
+    board[sq] = color;
+    captures(3 - color, sq);
+    
+    // Thêm nước đi vào lịch sử
+    if (!moveHistory.includes(sq)) {
+        moveHistory.push(sq);
+    }
+    
+    userMove = sq;
+    
+    // Debug trạng thái sau khi đặt quân
+    console.log('Debug - Sau khi đặt quân:', {
+        newBoard: [...board],
+        moveHistory: [...moveHistory],
+        ko: ko
+    });
+    
+    return true;
 }
 
 function getUrgentMoves() { /* Get escape squares of groups with less than 3 liberties */
@@ -708,11 +742,39 @@ function evaluate() {
         window.loadWeights();
     }
 
+    // Debug chi tiết các biến thành phần
+    console.log('Debug các biến thành phần:');
+    console.log('board:', board);
+    console.log('side:', side);
+    console.log('ko:', ko);
+    console.log('board length:', board.length);
+    console.log('board size:', Math.sqrt(board.length));
+
     const gameState = {
         board: board,
         side: side,
         ko: ko
     };
+
+    // Debug gameState
+    console.log('Debug gameState:', {
+        board: gameState.board,
+        side: gameState.side,
+        ko: gameState.ko,
+        boardSize: Math.sqrt(gameState.board.length)
+    });
+
+    // Debug một số ô cụ thể trên bàn cờ
+    const center = Math.floor(Math.sqrt(board.length) / 2);
+    const centerIndex = center * Math.sqrt(board.length) + center;
+    console.log('Debug ô trung tâm:', {
+        index: centerIndex,
+        value: board[centerIndex],
+        position: {
+            row: Math.floor(centerIndex / Math.sqrt(board.length)),
+            col: centerIndex % Math.sqrt(board.length)
+        }
+    });
 
     return neuralNet.evaluate(gameState);
 }
@@ -888,6 +950,11 @@ function play(depth) {
     let currentScore = 0;
     bestMove = 0;
     
+    console.log('Debug - Bắt đầu lượt đi của máy:');
+    console.log('Bên đang đi:', side === BLACK ? 'Đen' : 'Trắng');
+    console.log('Trạng thái bàn cờ:', board);
+    console.log('Lịch sử nước đi:', moveHistory);
+    
     // Trước tiên, thử tìm nước đi tốt nhất từ dữ liệu training
     const trainingMove = findBestMoveFromTraining(board, side);
     
@@ -912,6 +979,7 @@ function play(depth) {
                 emptySquares.push(i);
             }
         }
+        console.log('Các ô trống còn lại:', emptySquares);
         if (emptySquares.length > 0) {
             bestMove = emptySquares[Math.floor(Math.random() * emptySquares.length)];
             console.log("Đã chọn nước đi ngẫu nhiên:", bestMove);
@@ -949,6 +1017,11 @@ function play(depth) {
     drawBoard();
     addToHistory(bestMove, side);
     updateScore();
+    
+    console.log('Debug - Kết thúc lượt đi của máy:');
+    console.log('Nước đi vừa thực hiện:', bestMove);
+    console.log('Bên tiếp theo:', side === BLACK ? 'Đen' : 'Trắng');
+    
     return true;
 }
 
@@ -1190,7 +1263,7 @@ function autoRestartGame() {
 }
 
 function startComputerVsComputer() {
-    console.log('Computer vs Computer mode');
+    console.log('Bắt đầu chế độ Computer vs Computer');
     canvas.removeEventListener('click', userInput);
     
     // Dừng interval trước đó nếu có
@@ -1203,13 +1276,20 @@ function startComputerVsComputer() {
     
     // Bắt đầu interval mới
     gameInterval = setInterval(() => {
+        console.log('Debug - Chuẩn bị lượt đi mới:');
+        console.log('Bên đang đi:', side === BLACK ? 'Đen' : 'Trắng');
+        
         if (!play(6)) {
+            console.log('Không thể thực hiện nước đi, kết thúc game');
             clearInterval(gameInterval);
             endGame();
-            console.log("Game over!");
-        return;
-      }
+            return;
+        }
+        
+        // Chuyển lượt
         side = 3 - side;
+        console.log('Đã chuyển lượt, bên tiếp theo:', side === BLACK ? 'Đen' : 'Trắng');
+        
         drawBoard();
     }, 1000);
 }

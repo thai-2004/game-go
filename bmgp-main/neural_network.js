@@ -23,6 +23,47 @@ if (typeof window.neuralNet === 'undefined') {
                 return 0;
             }
 
+            // Debug chi tiết gameState trong NeuralNetwork
+            console.log('Debug chi tiết gameState trong NeuralNetwork:');
+            console.log('Board:', gameState.board);
+            console.log('Side:', gameState.side);
+            console.log('Ko:', gameState.ko);
+            console.log('Board size:', Math.sqrt(gameState.board.length));
+
+          
+            let blackCount = 0;
+            let whiteCount = 0;
+            let emptyCount = 0;
+            
+            
+            console.log('Debug chi tiết từng ô:');
+            for (let i = 0; i < gameState.board.length; i++) {
+                const row = Math.floor(i / Math.sqrt(gameState.board.length));
+                const col = i % Math.sqrt(gameState.board.length);
+                
+                if (gameState.board[i] === NN_BLACK) {
+                    blackCount++;
+                    console.log(`Ô [${row},${col}]: Đen`);
+                }
+                else if (gameState.board[i] === NN_WHITE) {
+                    whiteCount++;
+                    console.log(`Ô [${row},${col}]: Trắng`);
+                }
+                else if (gameState.board[i] === NN_EMPTY) {
+                    emptyCount++;
+                    console.log(`Ô [${row},${col}]: Trống`);
+                }
+                else {
+                    console.log(`Ô [${row},${col}]: Giá trị không hợp lệ (${gameState.board[i]})`);
+                }
+            }
+            
+            console.log('Số lượng quân cờ (đếm thủ công):', {
+                black: blackCount,
+                white: whiteCount,
+                empty: emptyCount
+            });
+
             const features = this.extractFeatures(gameState);
             let score = 0;
             
