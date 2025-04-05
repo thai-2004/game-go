@@ -210,9 +210,40 @@ if (typeof window.neuralNet === 'undefined') {
             this.loadSavedData();
         }
 
+        // Thêm phương thức kiểm tra dữ liệu trùng lặp
+        isDuplicateData(board, move, side) {
+            return this.gameData.some(item => {
+                // So sánh nước đi và lượt chơi
+                if (item.move !== move || item.side !== side) {
+                    return false;
+                }
+                
+                // So sánh bàn cờ (board)
+                const existingBoard = item.board;
+                if (existingBoard.length !== board.length) {
+                    return false;
+                }
+                
+                // So sánh từng ô trên bàn cờ
+                for (let i = 0; i < board.length; i++) {
+                    if (existingBoard[i] !== board[i]) {
+                        return false;
+                    }
+                }
+                
+                return true; // Nếu tất cả đều giống nhau thì là dữ liệu trùng lặp
+            });
+        }
+
         saveGameState(board, move, side, result) {
             // Tạo một bản sao của board để tránh tham chiếu
             const boardCopy = JSON.parse(JSON.stringify(board));
+            
+            // Kiểm tra trùng lặp trước khi thêm vào
+            if (this.isDuplicateData(boardCopy, move, side)) {
+                console.log("Bỏ qua dữ liệu trùng lặp");
+                return; // Bỏ qua nếu là dữ liệu trùng lặp
+            }
             
             // Lưu trạng thái game với thông tin thêm
             this.gameData.push({
@@ -273,6 +304,32 @@ if (typeof window.neuralNet === 'undefined') {
             this.gameData = [];
             localStorage.removeItem('goGameTrainingData');
             console.log("Đã xóa tất cả dữ liệu training");
+        }
+        
+        // Xóa dữ liệu trùng lặp
+        removeDuplicates() {
+            const uniqueData = [];
+            const seen = new Set();
+            
+            for (const item of this.gameData) {
+                // Tạo key duy nhất cho mỗi bản ghi
+                const key = `${item.move}-${item.side}-${JSON.stringify(item.board)}`;
+                
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueData.push(item);
+                }
+            }
+            
+            const removedCount = this.gameData.length - uniqueData.length;
+            this.gameData = uniqueData;
+            
+            if (removedCount > 0) {
+                console.log(`Đã xóa ${removedCount} bản ghi trùng lặp`);
+                this.saveData();
+            }
+            
+            return removedCount;
         }
     }
 

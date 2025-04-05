@@ -205,3 +205,22 @@ button:hover {
   background-color: #45a049;
 }
 
+#autoLearnButton {
+  background-color: #3498db;
+  color: white;
+  font-weight: bold;
+}
+
+#autoLearnButton:hover {
+  background-color: #2980b9;
+}
+
+#cleanDuplicatesButton {
+  background-color: #e74c3c;
+  color: white;
+}
+
+#cleanDuplicatesButton:hover {
+  background-color: #c0392b;
+}
+

@@ -9,9 +9,9 @@
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 </head>
 <body>
-  <div id = "intro">
+  <!-- <div id = "intro">
     <span id = "intro-text"></span>
-  </div>
+  </div> -->
   <div class="stars"></div>
   <div id="container">
     <div id="controls">
@@ -26,11 +26,27 @@
         <option value="computer-computer">Máy vs. Máy</option>
       </select>
       <button id="startButton">Bắt đầu</button>
-      <button id="viewWeightsButton">Xem trọng số</button>
-      <button id="saveWeightsButton">Lưu trọng số</button>
-      <button id="loadWeightsButton">Tải trọng số</button>
-      <button id="viewDataButton">Xem dữ liệu</button>
-      <button id="clearDataButton">Xóa dữ liệu</button>
+      <button id="autoLearnButton">Tự động học</button>
+      <button id="cleanDuplicatesButton">Xóa dữ liệu trùng</button>
+      <div style="margin-top: 5px;">
+        <label style="font-size: 14px; color: #666;">
+          <input type="checkbox" id="autoRestartCheckbox" checked> Tự động bắt đầu lại
+        </label>
+      </div>
+      <!-- Ẩn các nút không cần thiết -->
+      <div style="display: none;">
+        <button id="viewWeightsButton">Xem trọng số</button>
+        <button id="saveWeightsButton">Lưu trọng số</button>
+        <button id="loadWeightsButton">Tải trọng số</button>
+        <button id="viewDataButton">Xem dữ liệu</button>
+        <button id="clearDataButton">Xóa dữ liệu</button>
+        <button id="exportDataButton">Xuất dữ liệu</button>
+        <button id="importDataButton">Nhập dữ liệu</button>
+        <button id="removeDuplicatesButton">Xóa trùng lặp</button>
+        <input type="file" id="importFileInput" style="display: none;" accept=".json">
+      </div>
+      <!-- Thêm container hiển thị thông báo tự động -->
+      <div id="auto-learning-status" style="margin-top: 10px; color: #4CAF50; font-style: italic;"></div>
     </div>
     
     <div id="weights-display" style="display: none;">
@@ -48,11 +64,11 @@
     <div id="score">Đen đi trước</div>
   </div>
 
-  <script>
+  <!-- <script>
     particlesJS.load('intro', 'particles.json', function() {
       console.log('Particles.js loaded');
     });
-  </script>
+  </script> -->
 
   <!-- Load các script của game theo thứ tự đúng -->
   <script src="neural_network.js"></script>
