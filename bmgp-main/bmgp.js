@@ -494,10 +494,16 @@ function userInput(event) {
   if (board[sq]) return;
   if (!setStone(sq, side, true)) return;
   drawBoard();
-    addToHistory(sq, side);
+  addToHistory(sq, side);
   if (gameMode === 'computer') {
         side = 3 - side;
-    setTimeout(function() { play(6); }, 10);
+    setTimeout(function() { 
+        play(6); 
+        // Thêm dòng này để chuyển lượt về người chơi sau khi máy đi xong
+        side = 3 - side;
+        // Cập nhật giao diện
+        updateScore();
+    }, 10);
   } else {
         side = 3 - side;
   }
@@ -800,10 +806,18 @@ function search(depth) {
         return evaluate();
     }
 
+    let bestMoveAtCurrentDepth = EMPTY;
+
     for (let sq of validMoves) {
         // Bỏ qua các ô nằm sát cạnh bàn cờ nếu đang ở độ sâu 1
-        for (let offset of [1, size, -1, -size])
-            if (board[sq + offset] == OFFBOARD && depth == 1) continue;
+        let skipMove = false;
+        for (let offset of [1, size, -1, -size]) {
+            if (board[sq + offset] == OFFBOARD && depth == 1) {
+                skipMove = true;
+                break;
+            }
+        }
+        if (skipMove) continue;
 
         if (sq == ko) continue;
 
@@ -817,12 +831,17 @@ function search(depth) {
 
         if (currentScore > bestScore) {
             bestScore = currentScore;
-            if (depth == 6) bestMove = sq;
+            bestMoveAtCurrentDepth = sq;
         }
 
         board = JSON.parse(oldBoard);
         side = oldSide;
         ko = oldKo;
+    }
+
+    // Chỉ cập nhật bestMove ở cấp độ cao nhất
+    if (depth === 6 && bestMoveAtCurrentDepth !== EMPTY) {
+        bestMove = bestMoveAtCurrentDepth;
     }
 
     return bestScore;
@@ -945,58 +964,106 @@ function calculateBoardSimilarity(board1, board2) {
     return totalCount > 0 ? matchCount / totalCount : 0;
 }
 
-// Sửa đổi hàm play để sử dụng dữ liệu training trước khi tìm kiếm
 function play(depth) {
     let currentScore = 0;
-    bestMove = 0;
+    let bestMove = EMPTY;
     
     console.log('Debug - Bắt đầu lượt đi của máy:');
     console.log('Bên đang đi:', side === BLACK ? 'Đen' : 'Trắng');
-    console.log('Trạng thái bàn cờ:', board);
-    console.log('Lịch sử nước đi:', moveHistory);
+    
+    // Đếm số ô trống để kiểm tra
+    let emptyCount = 0;
+    for (let i = 0; i < board.length; i++) {
+        if (board[i] === EMPTY) emptyCount++;
+    }
+    console.log('Số ô trống:', emptyCount);
+    
+    // Kiểm tra xem game có thể tiếp tục không
+    if (emptyCount === 0) {
+        console.log("Bàn cờ đã đầy - kết thúc ván!");
+        endGame();
+        return false;
+    }
     
     // Trước tiên, thử tìm nước đi tốt nhất từ dữ liệu training
     const trainingMove = findBestMoveFromTraining(board, side);
     
-    // Nếu tìm thấy nước đi tốt từ dữ liệu và chưa được đi trong ván này
-    if (trainingMove !== null && !moveHistory.includes(trainingMove) && board[trainingMove] === EMPTY) {
+    // Kiểm tra nước đi từ training có hợp lệ không
+    let useTrainingMove = false;
+    if (trainingMove !== null && board[trainingMove] === EMPTY) {
         console.log("Sử dụng nước đi từ dữ liệu training:", trainingMove);
         updateLearningStatus("AI đang sử dụng kinh nghiệm đã học");
         bestMove = trainingMove;
-    } else {
-        // Nếu không tìm thấy, dùng thuật toán tìm kiếm thông thường
-        console.log("Không tìm thấy nước đi từ dữ liệu, dùng thuật toán tìm kiếm");
+        useTrainingMove = true;
+    }
+    
+    // Nếu không dùng được nước đi từ training, dùng thuật toán tìm kiếm
+    if (!useTrainingMove) {
+        console.log("Dùng thuật toán tìm kiếm");
         updateLearningStatus("AI đang tính toán nước đi tốt nhất");
         currentScore = search(depth);
+        
+        // DEBUG: Kiểm tra bestMove sau khi chạy search
+        console.log("Sau khi search, bestMove =", bestMove);
     }
 
-    // Nếu không tìm được nước đi hoặc nước đi đã được chọn trước đó, chọn một nước đi ngẫu nhiên từ những ô trống còn lại
-    if (!bestMove || moveHistory.includes(bestMove) || board[bestMove] !== EMPTY) {
-        console.log("Tìm nước đi mới - nước cũ có thể đã được đi");
+    // Kiểm tra lại nước đi đã chọn có hợp lệ không
+    if (bestMove === EMPTY || board[bestMove] !== EMPTY) {
+        console.log("Nước đi đã chọn không hợp lệ, tìm nước đi mới");
+        
+        // Tìm tất cả các ô trống
         let emptySquares = [];
         for (let i = 0; i < size * size; i++) {
-            if (board[i] === EMPTY && !moveHistory.includes(i)) {
+            if (board[i] === EMPTY) {
                 emptySquares.push(i);
             }
         }
+        
         console.log('Các ô trống còn lại:', emptySquares);
         if (emptySquares.length > 0) {
             bestMove = emptySquares[Math.floor(Math.random() * emptySquares.length)];
             console.log("Đã chọn nước đi ngẫu nhiên:", bestMove);
         } else {
-            console.log("Không còn nước đi hợp lệ hoặc bàn cờ đã đầy - kết thúc ván!");
+            console.log("Không còn nước đi hợp lệ - kết thúc ván!");
             endGame();
             return false;
         }
     }
 
-    if (!setStone(bestMove, side, false)) {
-        console.log("Không thể đặt quân cờ, bỏ qua lượt");
-        return false;
+    console.log("Chuẩn bị đặt quân tại vị trí:", bestMove);
+    
+    // Đặt quân cờ, trả về false nếu không thể đặt
+    if (!setStone(bestMove, side, true)) {
+        console.log("Không thể đặt quân cờ tại vị trí " + bestMove + ", tìm vị trí khác");
+        
+        // Tìm một ô trống bất kỳ nếu không đặt được
+        let anyEmptySquare = -1;
+        for (let i = 0; i < board.length; i++) {
+            if (board[i] === EMPTY) {
+                anyEmptySquare = i;
+                break;
+            }
+        }
+        
+        // Nếu còn ô trống, thử đặt vào đó
+        if (anyEmptySquare !== -1) {
+            console.log("Thử đặt vào ô trống:", anyEmptySquare);
+            if (!setStone(anyEmptySquare, side, true)) {
+                console.log("Vẫn không thể đặt quân, bỏ qua lượt");
+                return false;
+            }
+            bestMove = anyEmptySquare;
+        } else {
+            console.log("Không còn ô trống, kết thúc ván");
+            endGame();
+            return false;
+        }
     }
 
     // Lưu trạng thái game sau mỗi nước đi
-    dataCollector.saveGameState(board, bestMove, side, evaluate());
+    if (dataCollector) {
+        dataCollector.saveGameState(board, bestMove, side, evaluate());
+    }
     
     // Tăng bộ đếm nước đi
     moveCounter++;
@@ -1008,23 +1075,23 @@ function play(depth) {
         moveCounter = 0; // Reset bộ đếm
     }
     
-    // Kiểm tra xem có cần tự động xuất file sau AUTO_EXPORT_FREQUENCY nước đi
+    // Kiểm tra xuất file
     if (exportCounter >= AUTO_EXPORT_FREQUENCY) {
         exportData();
-        exportCounter = 0; // Reset bộ đếm xuất
+        exportCounter = 0;
     }
 
+    // Cập nhật giao diện và lịch sử
     drawBoard();
     addToHistory(bestMove, side);
     updateScore();
     
     console.log('Debug - Kết thúc lượt đi của máy:');
     console.log('Nước đi vừa thực hiện:', bestMove);
-    console.log('Bên tiếp theo:', side === BLACK ? 'Đen' : 'Trắng');
+    console.log('Bên tiếp theo:', (3 - side) === BLACK ? 'Đen' : 'Trắng');
     
     return true;
 }
-
 // Hàm học liên tục trên dữ liệu đã thu thập
 function continuousLearning() {
     console.log("Đang thực hiện học liên tục...");
