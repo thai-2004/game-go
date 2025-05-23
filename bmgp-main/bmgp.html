@@ -9,91 +9,83 @@
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 </head>
 <body>
-  <div id = "intro">
+  <!-- <div id = "intro">
     <span id = "intro-text"></span>
-  </div>
+  </div> -->
   <div class="stars"></div>
   <div id="container">
-    <div id="controls">
-      <select id="size" aria-label="Select board size">
-        <option value="9" selected>9x9</option>
-        <option value="13">13x13</option>
-        <option value="19">19x19</option>
-      </select>
-      <select id="gameMode" aria-label="Select game mode">
-        <option value="human">Người vs. Người</option>
-        <option value="computer" selected>Người vs. Máy</option>
-        <option value="computer-computer">Máy vs. Máy</option>
-      </select>
-      <button id="startButton">Bắt đầu</button>
-      <button id="autoLearnButton">Tự động học</button>
-      <button id="cleanDuplicatesButton">Xóa dữ liệu trùng</button>
-      <div style="margin-top: 5px;">
-        <label style="font-size: 14px; color: #666;">
-          <input type="checkbox" id="autoRestartCheckbox" checked> Tự động bắt đầu lại
-        </label>
-      </div>
-      <!-- Ẩn các nút không cần thiết -->
-      <div style="display: none;">
-        <button id="viewWeightsButton">Xem trọng số</button>
-        <button id="saveWeightsButton">Lưu trọng số</button>
-        <button id="loadWeightsButton">Tải trọng số</button>
-        <button id="viewDataButton">Xem dữ liệu</button>
-        <button id="clearDataButton">Xóa dữ liệu</button>
-        <button id="exportDataButton">Xuất dữ liệu</button>
-        <button id="importDataButton">Nhập dữ liệu</button>
-        <button id="removeDuplicatesButton">Xóa trùng lặp</button>
-        <input type="file" id="importFileInput" style="display: none;" accept=".json">
-      </div>
-      <!-- Thêm container hiển thị thông báo tự động -->
-      <div id="auto-learning-status" style="margin-top: 10px; color: #4CAF50; font-style: italic;"></div>
-      <!-- Thêm lựa chọn mốc thời gian -->
-      <div id="time-controls" style="margin-top: 10px;">
-        <label>
-          <input type="radio" name="timeMode" value="turn" checked> Theo lượt
-        </label>
-        <input type="number" id="turnTimeInput" value="30" min="5" max="300" style="width:60px; margin-left:8px;"> giây/lượt
-        <label style="margin-left:16px;">
-          <input type="radio" name="timeMode" value="total"> Tổng thời gian
-        </label>
-        <select id="totalTimeInput" style="width:100px; display:none; margin-left:8px;">
-          <option value="300">5 phút</option>
-          <option value="600">10 phút</option>
-          <option value="900">15 phút</option>
-          <option value="1800">30 phút</option>
-        </select> tổng thời gian
-      </div>
-      <!-- Thêm giao diện tên + thời gian cho 2 người chơi -->
-      <div id="players-info" style="display: flex; justify-content: space-between; margin: 10px 0;">
-        <div>
-          <span id="player1-name">Đen</span>: <span id="player1-time">--:--</span>
+    <div id="setup-container">
+      <div id="controls">
+        <select id="size" aria-label="Select board size">
+          <option value="9" selected>9x9</option>
+          <option value="13">13x13</option>
+          <option value="19">19x19</option>
+        </select>
+        <select id="gameMode" aria-label="Select game mode">
+          <option value="human">Người vs. Người</option>
+          <option value="computer" selected>Người vs. Máy</option>
+          <option value="computer-computer">Máy vs. Máy</option>
+        </select>
+        <button id="startButton">Bắt đầu</button>
+        <button id="autoLearnButton">Tự động học</button>
+        <button id="cleanDuplicatesButton">Xóa dữ liệu trùng</button>
+        <div style="margin-top: 5px;">
+          <label style="font-size: 14px; color: #666;">
+            <input type="checkbox" id="autoRestartCheckbox" checked> Tự động bắt đầu lại
+          </label>
         </div>
-        <div>
-          <span id="player2-name">Trắng</span>: <span id="player2-time">--:--</span>
+        <div id="auto-learning-status" style="margin-top: 10px; color: #4CAF50; font-style: italic;"></div>
+        <div id="time-controls" style="margin-top: 10px;">
+          <label>
+            <input type="radio" name="timeMode" value="turn" checked> Theo lượt
+          </label>
+          <input type="number" id="turnTimeInput" value="30" min="5" max="300" style="width:60px; margin-left:8px;"> giây/lượt
+          <label style="margin-left:16px;">
+            <input type="radio" name="timeMode" value="total"> Tổng thời gian
+          </label>
+          <select id="totalTimeInput" style="width:100px; display:none; margin-left:8px;">
+            <option value="300">5 phút</option>
+            <option value="600">10 phút</option>
+            <option value="900">15 phút</option>
+            <option value="1800">30 phút</option>
+          </select> tổng thời gian
         </div>
       </div>
     </div>
-    
-    <div id="weights-display" style="display: none;">
-      <h3>Trọng số Neural Network:</h3>
-      <pre id="weights-content"></pre>
-    </div>
-    
-    <div id="game-container">
-      <canvas id="gobang" width="500" height="500" ></canvas>
-      <div id="history">
-        <h3>Lịch sử nước đi</h3>
-        <ul id="moveList"></ul>
+    <div id="game-container" style="display:none;">
+      <div id="players-panel">
+        <div class="player-card black-player">
+          <div class="avatar"><img src="aaaaa.jpg"" alt="Đen"></div>
+          <div class="player-name" id="player1-name">Đen</div>
+          <div class="player-time" id="player1-time">--:--</div>
+        </div>
+        <div class="player-card white-player">
+          <div class="avatar"><img src="aaaaa.jpg" alt="Trắng"></div>
+          <div class="player-name" id="player2-name">Trắng</div>
+          <div class="player-time" id="player2-time">--:--</div>
+        </div>
       </div>
+      <button id="backToSetupButton" style="margin-bottom:10px;">Quay lại</button>
+      <div id="weights-display" style="display: none;">
+        <h3>Trọng số Neural Network:</h3>
+        <pre id="weights-content"></pre>
+      </div>
+      <div id="game-board-area">
+        <canvas id="gobang" width="500" height="500"></canvas>
+        <div id="history">
+          <h3>Lịch sử nước đi</h3>
+          <ul id="moveList"></ul>
+        </div>
+      </div>
+      <div id="score">Đen đi trước</div>
     </div>
-    <div id="score">Đen đi trước</div>
   </div>
 
-  <script>
+  <!-- <script>
     particlesJS.load('intro', 'particles.json', function() {
       console.log('Particles.js loaded');
     });
-  </script>
+  </script> -->
 
   <!-- Load các script của game theo thứ tự đúng -->
   <script src="neural_network.js"></script>

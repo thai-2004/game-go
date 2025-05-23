@@ -66,6 +66,13 @@ let player1Time, player2Time, player1Name, player2Name, timeModeRadios, turnTime
 
 // Khởi tạo bàn cờ và vẽ khi trang web được tải
 document.addEventListener('DOMContentLoaded', function() {
+    // Ẩn game-container khi load trang, chỉ hiện setup-container
+    const setupContainer = document.getElementById('setup-container');
+    const gameContainer = document.getElementById('game-container');
+    if (setupContainer && gameContainer) {
+        setupContainer.style.display = '';
+        gameContainer.style.display = 'none';
+    }
     console.log("DOM đã load xong");
     
     // Tự động tải trọng số từ localStorage khi khởi động
@@ -300,6 +307,11 @@ gameModeSelect.addEventListener('change', function() {
     }
 
     startButton.addEventListener('click', function() {
+        // Ẩn setup-container, hiện game-container
+        if (setupContainer && gameContainer) {
+            setupContainer.style.display = 'none';
+            gameContainer.style.display = '';
+        }
         console.log('Nút Start được nhấn');
         // Cập nhật kích thước bàn cờ và tính lại kích thước ô
         size = parseInt(selectSize.value);
@@ -446,6 +458,23 @@ gameModeSelect.addEventListener('change', function() {
             }
         });
     }
+
+    // Xử lý nút Quay lại
+    const backToSetupButton = document.getElementById('backToSetupButton');
+    if (backToSetupButton) {
+        backToSetupButton.addEventListener('click', function() {
+            if (setupContainer && gameContainer) {
+                setupContainer.style.display = '';
+                gameContainer.style.display = 'none';
+            }
+            // Dừng game nếu đang chạy
+            if (typeof stopAutoLearning === 'function') stopAutoLearning();
+            if (typeof timerInterval !== 'undefined' && timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        });
+    }
 });
 
 // GUI
@@ -533,6 +562,30 @@ function getHoshiPoints(size) {
     return points;
 }
 
+// Hàm trả về danh sách các nước đi hợp lệ cho bên hiện tại
+function getValidMoves() {
+    const validMoves = [];
+    for (let sq = 0; sq < size * size; sq++) {
+        // Không xét ô đã có quân
+        if (board[sq] !== EMPTY) continue;
+        // Không xét nước Ko
+        if (sq === ko) continue;
+        // Thử đặt quân tạm thời để kiểm tra tự sát
+        const oldBoard = [...board];
+        const oldKo = ko;
+        board[sq] = side;
+        captures(3 - side, sq);
+        count(sq, side);
+        const suicide = liberties.length === 0;
+        restoreBoard();
+        board[sq] = oldBoard[sq];
+        ko = oldKo;
+        if (suicide) continue;
+        validMoves.push(sq);
+    }
+    return validMoves;
+}
+
 function userInput(event) {
   // Chỉ cho phép người chơi đi nếu đúng lượt (chế độ người vs máy)
   if (gameMode === 'computer' && side !== BLACK) return;
@@ -541,14 +594,17 @@ function userInput(event) {
   let mouseY = event.clientY - rect.top;
   let col = Math.floor(mouseX / cell);
   let row = Math.floor(mouseY / cell);
-    
     // Kiểm tra biên
     if (col < 0 || col >= size || row < 0 || row >= size) {
         return;
     }
-    
   let sq = row * size + col;
-  if (board[sq]) return;
+  // Lấy danh sách nước đi hợp lệ
+  const validMoves = getValidMoves();
+  if (!validMoves.includes(sq)) {
+    alert('Bạn phải đi vào một ô hợp lệ (không phải Ko, không tự sát, không trùng)!');
+    return;
+  }
   if (!setStone(sq, side, true)) return;
   drawBoard();
   addToHistory(sq, side);
@@ -612,13 +668,33 @@ function score() { /* Scores game, returns points [empty, black, white]*/
 function updateScore() {
     const pts = score();
     const element = document.getElementById("score");
-    let scoreText = `Đen: ${Number(pts[BLACK]).toFixed(1)} lãnh thổ`;
-    scoreText += `, Trắng: ${Number(pts[WHITE]).toFixed(1)} lãnh thổ`;
-    scoreText += `, Trống: ${Number(pts[EMPTY]).toFixed(1)} lãnh thổ`;
+    let scoreText = '';
+    
+    // Tính điểm chi tiết
+    const blackStones = board.filter(sq => sq === BLACK).length;
+    const whiteStones = board.filter(sq => sq === WHITE).length;
+    const blackTerritory = pts[BLACK];
+    const whiteTerritory = pts[WHITE];
+    const komi = 6.5;
+    
+    // Hiển thị điểm chi tiết
+    scoreText += `Đen:<br>`;
+    scoreText += `- Số quân: ${blackStones}<br>`;
+    scoreText += `- Lãnh thổ: ${blackTerritory.toFixed(1)}<br>`;
+    scoreText += `- Tổng điểm: ${(blackStones + blackTerritory).toFixed(1)}<br><br>`;
+    
+    scoreText += `Trắng:<br>`;
+    scoreText += `- Số quân: ${whiteStones}<br>`;
+    scoreText += `- Lãnh thổ: ${whiteTerritory.toFixed(1)}<br>`;
+    scoreText += `- Komi: ${komi}<br>`;
+    scoreText += `- Tổng điểm: ${(whiteStones + whiteTerritory + komi).toFixed(1)}<br>`;
     
     if (gameEnded) {
         const finalScore = calculateScore();
-        scoreText += `\nĐiểm cuối cùng - Đen: ${finalScore.black.toFixed(1)}, Trắng: ${finalScore.white.toFixed(1)}`;
+        scoreText += `<br>Kết quả cuối cùng:<br>`;
+        scoreText += `Đen: ${finalScore.black.toFixed(1)} điểm<br>`;
+        scoreText += `Trắng: ${finalScore.white.toFixed(1)} điểm<br>`;
+        scoreText += `Người thắng: ${finalScore.winner === BLACK ? 'Đen' : 'Trắng'}`;
     }
     
     element.innerHTML = scoreText;
@@ -665,7 +741,7 @@ function inEye(sq) { /* Check if square is in diamond shape */
 }
 
 function clearBlock(move) { /* Erase stones when captured */
-  if (block.length == 1 && inEye(move, 0) == 3 - side) // Nếu chỉ có một viên đá trong block và ô move là "mắt" của bên đối thủ.
+  if (block.length == 1 && inEye(block[0]) == 3 - side) // Nếu chỉ có một viên đá trong block và ô move là "mắt" của bên đối thủ.
     ko = block[0]; // Đặt vị trí ko là vị trí của viên đá bị bắt.
   
   for (let i = 0; i < block.length; i++) // Lặp qua tất cả các viên đá trong block.
@@ -716,80 +792,42 @@ function restoreBoard() { /* Remove group markers */
 }
 
 function setStone(sq, color, user) { /* Place stone on board */
-    // Debug thông tin nước đi
-    console.log('Debug - setStone:', {
-        square: sq,
-        color: color === BLACK ? 'Đen' : 'Trắng',
-        isUser: user,
-        currentBoard: [...board]
-    });
-
-    // Lưu trạng thái bàn cờ trước khi đặt quân
     const oldBoard = [...board];
-    let old_ko = ko;
+    const oldKo = ko;
 
-    // Kiểm tra xem ô đã có viên đá hay chưa
     if (board[sq] != EMPTY) {
-        console.log('Nước đi không hợp lệ: Ô đã có quân');
-        // Rollback trạng thái bàn cờ
-        for (let i = 0; i < board.length; i++) board[i] = oldBoard[i];
-        ko = old_ko;
         if (user) alert("Illegal move!");
         return false;
-    } else if (sq === ko) {
-        console.log('Nước đi không hợp lệ: Nước đi ko');
-        // Rollback trạng thái bàn cờ
-        for (let i = 0; i < board.length; i++) board[i] = oldBoard[i];
-        ko = old_ko;
-        if (user) alert("Ko!");
-        return false;
-    }
+    } 
+    //else if (sq === ko) {
+    //     if (user) alert("Ko!");
+    //     return false;
+    // }
     
-    // Đặt quân cờ
+    ko = EMPTY;
+    
+    // Thử đặt quân và xử lý bắt quân
     board[sq] = color;
-    
-    // Kiểm tra và xử lý quân bị bắt
-    ko = EMPTY; // Reset ko trước khi kiểm tra bắt quân
     captures(3 - color, sq);
     
-    // Đếm số tự do
+    // Kiểm tra tự do của nhóm mới
     count(sq, color);
+    const suicide = liberties.length === 0;
     
-    // Kiểm tra nước đi tự sát
-    let suicide = liberties.length === 0;
-    
-    // Khôi phục trạng thái bàn cờ
+    // Khôi phục các đánh dấu (không ảnh hưởng đến quân đã đặt/bị xóa)
     restoreBoard();
     
-    if (suicide) {
-        console.log('Nước đi không hợp lệ: Tự sát');
-        // Rollback hoàn toàn trạng thái bàn cờ (bao gồm cả quân vừa đặt)
-        for (let i = 0; i < board.length; i++) board[i] = oldBoard[i];
-        ko = old_ko;
-        if (user) alert("Suicide move!");
-        return false;
-    }
+    // if (suicide) {
+    //     // Rollback trạng thái
+    //     board = [...oldBoard];
+    //     ko = oldKo;
+    //     if (user) alert("Suicide move!");
+    //     return false;
+    // }
     
-    // Nếu nước đi hợp lệ, thực hiện lại các bước
-    board[sq] = color;
-    captures(3 - color, sq);
-    // Nếu clearBlock không set ko (không có tình huống ko), thì ko phải là EMPTY
-    // Đảm bảo ko chỉ được giữ khi thực sự có tình huống ko
-    if (ko === undefined) ko = EMPTY;
-    
-    // Thêm nước đi vào lịch sử
-    if (!moveHistory.includes(sq)) {
-        moveHistory.push(sq);
-    }
-    
+    // Cập nhật lịch sử và userMove
     userMove = sq;
-    
-    // Debug trạng thái sau khi đặt quân
-    console.log('Debug - Sau khi đặt quân:', {
-        newBoard: [...board],
-        moveHistory: [...moveHistory],
-        ko: ko
-    });
+    moveHistory.push(sq);
     
     return true;
 }
@@ -1231,19 +1269,43 @@ function endGame() {
     resultMessage += `Đen: ${finalScore.black.toFixed(1)} điểm\n`;
     resultMessage += `Trắng: ${finalScore.white.toFixed(1)} điểm\n`;
     resultMessage += `Người thắng: ${finalScore.winner === BLACK ? 'Đen' : 'Trắng'}`;
-    
     alert(resultMessage);
-    
+
     // Cập nhật giao diện điểm số
     updateScore();
-    
+
+    // Sau khi hiện kết quả, hỏi người dùng muốn quay về trang tùy chọn không
+    setTimeout(function() {
+        if (confirm('Bạn có muốn quay về trang tùy chọn không?')) {
+            // Ẩn game-container, hiện setup-container
+            const setupContainer = document.getElementById('setup-container');
+            const gameContainer = document.getElementById('game-container');
+            if (setupContainer && gameContainer) {
+                setupContainer.style.display = '';
+                gameContainer.style.display = 'none';
+            }
+            // Reset bàn cờ
+            if (typeof stopAutoLearning === 'function') stopAutoLearning();
+            if (typeof timerInterval !== 'undefined' && timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            if (typeof initBoard === 'function') initBoard();
+            if (typeof drawBoard === 'function') drawBoard();
+            if (typeof updateScore === 'function') updateScore();
+            if (typeof updatePlayerTimes === 'function') updatePlayerTimes();
+            if (typeof moveList !== 'undefined' && moveList) moveList.innerHTML = '';
+        } else {
+            // Nếu không, có thể tự động chơi lại hoặc không làm gì
+        }
+    }, 200);
+
     // Nếu đang trong chế độ tự động học
     if (isAutoLearning) {
         // Lưu kết quả vào dữ liệu training
         if (dataCollector) {
             dataCollector.saveGameResult(finalScore.winner);
         }
-        
         // Huấn luyện AI với kết quả ván đấu
         if (AUTO_RESTART) {
             setTimeout(() => {
@@ -1489,7 +1551,7 @@ function startTimer() {
             updatePlayerTimes();
             clearInterval(timerInterval);
             // Kết thúc trò chơi và tổng kết người thắng cuộc
-            alert(`${playerNames[side]} hết giờ! Thua cuộc.`);
+            alert(`${playerNames[side]} hết giờ!`);
             endGame();
             return;
         }
