@@ -475,6 +475,18 @@ gameModeSelect.addEventListener('change', function() {
             }
         });
     }
+
+    // Thêm xử lý cho nút đầu hàng
+    const surrenderButton = document.getElementById('surrenderButton');
+    if (surrenderButton) {
+        surrenderButton.addEventListener('click', function() {
+            if (gameEnded) return;
+            
+            if (confirm('Bạn có chắc chắn muốn đầu hàng?')) {
+                handleSurrender();
+            }
+        });
+    }
 });
 
 // GUI
@@ -1571,4 +1583,27 @@ function formatTime(sec) {
     let m = Math.floor(sec / 60);
     let s = sec % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// Thêm hàm xử lý đầu hàng
+function handleSurrender() {
+    if (gameEnded) return;
+    
+    // Xác định người thắng (bên đối diện với người đầu hàng)
+    const winner = 3 - side;
+    
+    // Cập nhật điểm số
+    if (winner === BLACK) {
+        playerScores[BLACK] = 1;
+        playerScores[WHITE] = 0;
+    } else {
+        playerScores[BLACK] = 0;
+        playerScores[WHITE] = 1;
+    }
+    
+    // Kết thúc game
+    endGame();
+    
+    // Hiển thị thông báo
+    alert(`${playerNames[side]} đã đầu hàng! ${playerNames[winner]} thắng!`);
 }

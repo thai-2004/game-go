@@ -7,6 +7,41 @@
   <link rel="stylesheet" href="style.css">
   <!-- Load các script bên ngoài trước -->
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+  <style>
+    /* ... existing styles ... */
+    
+    #surrenderButton {
+        background-color: #ff4444;
+        color: white;
+        border: 2px solid #cc0000;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    #surrenderButton:hover {
+        background-color: #ff0000;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    #surrenderButton:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    #surrenderButton:disabled {
+        background-color: #cccccc;
+        border-color: #999999;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+  </style>
 </head>
 <body>
   <!-- <div id = "intro">
@@ -64,6 +99,7 @@
           <div class="player-name" id="player2-name">Trắng</div>
           <div class="player-time" id="player2-time">--:--</div>
         </div>
+        <button id="surrenderButton" class="game-button">Đầu hàng</button>
       </div>
       <button id="backToSetupButton" style="margin-bottom:10px;">Quay lại</button>
       <div id="weights-display" style="display: none;">
